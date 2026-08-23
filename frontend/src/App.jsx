@@ -65,7 +65,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/chat",
+        "https://parcelpilot-ai-agent-0u4s.onrender.com/chat",
         {
           method: "POST",
           headers: {
@@ -78,9 +78,7 @@ function App() {
       );
 
       if (!response.ok) {
-        throw new Error(
-          `Backend returned ${response.status}`
-        );
+        throw new Error(`Backend returned ${response.status}`);
       }
 
       const data = await response.json();
@@ -91,8 +89,7 @@ function App() {
         {
           role: "assistant",
           content:
-            data.answer ||
-            "The agent did not return an answer.",
+            data.answer || "The agent did not return an answer.",
           activity: data.activity || [],
         },
       ]);
@@ -104,7 +101,7 @@ function App() {
         {
           role: "assistant",
           content:
-            "I couldn't connect to the ParcelPilot backend. Make sure the FastAPI server is running on port 8000.",
+            "I couldn't connect to the ParcelPilot backend. Please try again in a moment.",
           activity: [],
           error: true,
         },
@@ -134,7 +131,7 @@ function App() {
             </div>
           </div>
 
-          {/* Only Support Chat navigation */}
+          {/* Navigation */}
           <nav className="navigation">
             <button className="nav-item active">
               <Bot size={18} />
@@ -196,8 +193,8 @@ function App() {
               <h3>How can I help?</h3>
 
               <p>
-                Ask ParcelPilot about orders, customers,
-                policies, service credits, or support tickets.
+                Ask ParcelPilot about orders, customers, policies,
+                service credits, or support tickets.
               </p>
 
               <div className="quick-actions">
@@ -268,8 +265,7 @@ function App() {
                                 key={activityIndex}
                               >
                                 <span>✓</span>
-                                Used{" "}
-                                {activity.tool}
+                                Used {activity.tool}
                               </div>
                             )
                           )}
@@ -313,14 +309,9 @@ function App() {
           <div className="composer">
             <input
               value={message}
-              onChange={(e) =>
-                setMessage(e.target.value)
-              }
+              onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey
-                ) {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   sendMessage();
                 }
