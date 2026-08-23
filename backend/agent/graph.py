@@ -371,7 +371,7 @@ you MUST:
 def create_parcelpilot_agent():
 
     model = ChatGoogleGenerativeAI(
-        model="gemini-3.6-flash",
+        model="gemini-3.5-flash-lite",
         temperature=0,
         max_retries=2,
     )
