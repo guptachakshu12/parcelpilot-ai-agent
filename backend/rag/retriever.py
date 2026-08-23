@@ -1,64 +1,83 @@
 from pathlib import Path
 import json
+import os
 
 import faiss
-from sentence_transformers import SentenceTransformer
+import numpy as np
+from dotenv import load_dotenv
+from google import genai
 
+load_dotenv()
 
 # Project root
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+# RAG files
 RAG_DIR = PROJECT_ROOT / "backend" / "rag"
-
 INDEX_FILE = RAG_DIR / "parcelpilot.index"
 METADATA_FILE = RAG_DIR / "metadata.json"
 
-MODEL_NAME = "all-MiniLM-L6-v2"
+# Gemini embedding model
+EMBEDDING_MODEL = "gemini-embedding-001"
+
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
 
 
-# Load the saved FAISS index
-if not INDEX_FILE.exists():
-    raise FileNotFoundError(
-        f"FAISS index not found: {INDEX_FILE}"
+def create_embedding(text):
+    """Create a Gemini embedding for a query."""
+
+    response = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=text
     )
 
-index = faiss.read_index(str(INDEX_FILE))
-
-
-# Load chunk metadata
-if not METADATA_FILE.exists():
-    raise FileNotFoundError(
-        f"Metadata file not found: {METADATA_FILE}"
+    embedding = np.array(
+        [response.embeddings[0].values],
+        dtype="float32"
     )
 
-with open(METADATA_FILE, "r", encoding="utf-8") as file:
-    metadata = json.load(file)
+    # Same normalization used during ingestion
+    faiss.normalize_L2(embedding)
+
+    return embedding
 
 
-# Load the same embedding model used during ingestion
-model = SentenceTransformer(MODEL_NAME)
+def load_rag_data():
+    """Load FAISS index and document metadata."""
+
+    if not INDEX_FILE.exists():
+        raise FileNotFoundError(
+            f"FAISS index not found: {INDEX_FILE}"
+        )
+
+    if not METADATA_FILE.exists():
+        raise FileNotFoundError(
+            f"Metadata file not found: {METADATA_FILE}"
+        )
+
+    index = faiss.read_index(
+        str(INDEX_FILE)
+    )
+
+    with open(
+        METADATA_FILE,
+        "r",
+        encoding="utf-8"
+    ) as file:
+        metadata = json.load(file)
+
+    return index, metadata
 
 
-def search_documents(query: str, top_k: int = 3):
-    """
-    Search the ParcelPilot document collection.
+def search_documents(query, top_k=5):
+    """Search the FAISS index using Gemini embeddings."""
 
-    Returns the most relevant document chunks.
-    """
+    index, metadata = load_rag_data()
 
-    if not query or not query.strip():
-        return []
+    query_embedding = create_embedding(query)
 
-    # Convert query into an embedding
-    query_embedding = model.encode(
-        [query],
-        convert_to_numpy=True
-    ).astype("float32")
-
-    # Normalize because the FAISS index uses cosine-style similarity
-    faiss.normalize_L2(query_embedding)
-
-    # Search FAISS
     scores, indices = index.search(
         query_embedding,
         top_k
@@ -66,47 +85,30 @@ def search_documents(query: str, top_k: int = 3):
 
     results = []
 
-    for score, idx in zip(scores[0], indices[0]):
-
-        # -1 means FAISS did not find a result
-        if idx == -1:
+    for score, index_id in zip(
+        scores[0],
+        indices[0]
+    ):
+        if index_id == -1:
             continue
 
-        document = metadata[idx]
+        document = metadata[index_id].copy()
 
-        results.append({
-            "score": float(score),
-            "source": document["source"],
-            "page": document["page"],
-            "text": document["text"]
-        })
+        document["score"] = float(score)
+
+        results.append(document)
 
     return results
 
 
 if __name__ == "__main__":
+    query = "Is LumenWorks eligible for a service credit?"
 
-    print("\n========== TESTING DOCUMENT SEARCH ==========\n")
+    results = search_documents(query)
 
-    test_queries = [
-        "What is Northstar's cancellation policy?",
-        "What is the service credit policy?",
-        "What is the current P1 response target?",
-        "Why can SwiftShip shipments still show BOOKED after pickup?"
-    ]
-
-    for query in test_queries:
-
-        print("\n" + "=" * 70)
-        print(f"QUERY: {query}")
-        print("=" * 70)
-
-        results = search_documents(query, top_k=3)
-
-        for i, result in enumerate(results, start=1):
-
-            print(f"\nResult {i}")
-            print(f"Score: {result['score']:.4f}")
-            print(f"Source: {result['source']}")
-            print(f"Page: {result['page']}")
-            print(f"Text: {result['text'][:500]}")
+    for result in results:
+        print("\n--------------------")
+        print(f"Score: {result['score']}")
+        print(f"Source: {result['source']}")
+        print(f"Page: {result['page']}")
+        print(result["text"])
