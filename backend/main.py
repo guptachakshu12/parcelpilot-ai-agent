@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,16 +13,20 @@ app = FastAPI(
 
 
 # ---------------------------------------------------------
-# CORS - allow React/Vite frontend
+# CORS - allow local frontend + Vercel frontend
 # ---------------------------------------------------------
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Local development
         "http://localhost:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+
+        # Production Vercel frontend
+        "https://parcelpilot-ai-agent.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -94,10 +99,8 @@ def chat(request: ChatRequest):
         # ---------------------------------------------
 
         final_message = messages[-1]
-
         content = final_message.content
 
-        # Gemini can sometimes return structured content
         if isinstance(content, list):
 
             text_parts = []
@@ -128,7 +131,6 @@ def chat(request: ChatRequest):
 
         for message in messages:
 
-            # Tool calls made by the agent
             if (
                 hasattr(message, "tool_calls")
                 and message.tool_calls
@@ -147,6 +149,10 @@ def chat(request: ChatRequest):
                         "status": "completed",
                     })
 
+
+        # ---------------------------------------------
+        # Return successful response
+        # ---------------------------------------------
 
         return {
             "answer": content,
