@@ -650,9 +650,9 @@ A walkthrough video covering the architecture, implementation, technical decisio
 
 Hosted application:
 
-**Frontend:** [Add Vercel URL]
+**Frontend:** https://parcelpilot-ai-agent.vercel.app/
 
-**Backend:** [Add Render URL]
+**Backend:** https://parcelpilot-ai-agent-0u4s.onrender.com/
 
 ---
 
