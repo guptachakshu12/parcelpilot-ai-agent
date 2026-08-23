@@ -26,7 +26,8 @@ app.add_middleware(
         "http://127.0.0.1:5174",
 
         # Production Vercel frontend
-        "https://parcelpilot-ai-agent-e5crvhg3y-chakshu-guptas-projects.vercel.app",
+        # Production Vercel frontend
+       "https://parcelpilot-ai-agent.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
