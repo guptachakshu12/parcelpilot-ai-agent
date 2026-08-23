@@ -1,24 +1,29 @@
 from pathlib import Path
 import json
+import os
 
 import faiss
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+from google import genai
 
+load_dotenv()
 
 # Project root
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Folder containing the assessment PDFs
+# Folder containing assessment PDFs
 DATA_DIR = PROJECT_ROOT / "data"
 
-# Where we will save the vector index
+# RAG output
 RAG_DIR = PROJECT_ROOT / "backend" / "rag"
 INDEX_FILE = RAG_DIR / "parcelpilot.index"
 METADATA_FILE = RAG_DIR / "metadata.json"
 
-# Embedding model
-MODEL_NAME = "all-MiniLM-L6-v2"
+# Gemini embedding model
+EMBEDDING_MODEL = "gemini-embedding-001"
+
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 def extract_pdf_text(pdf_path):
@@ -46,7 +51,6 @@ def create_chunks(text, chunk_size=800, overlap=150):
     text = " ".join(text.split())
 
     chunks = []
-
     start = 0
 
     while start < len(text):
@@ -62,8 +66,26 @@ def create_chunks(text, chunk_size=800, overlap=150):
     return chunks
 
 
+def create_embeddings(texts):
+    """Create Gemini embeddings."""
+
+    embeddings = []
+
+    for i, text in enumerate(texts):
+        print(f"Embedding {i + 1}/{len(texts)}")
+
+        response = client.models.embed_content(
+            model=EMBEDDING_MODEL,
+            contents=text
+        )
+
+        embeddings.append(response.embeddings[0].values)
+
+    return embeddings
+
+
 def ingest_documents():
-    """Read PDFs, create embeddings and build FAISS index."""
+    """Read PDFs, create Gemini embeddings and build FAISS index."""
 
     pdf_files = sorted(DATA_DIR.glob("*.pdf"))
 
@@ -99,43 +121,60 @@ def ingest_documents():
     print(f"\nTotal chunks created: {len(documents)}")
 
     if not documents:
-        raise ValueError("No text could be extracted from the PDFs.")
-
-    # Load embedding model
-    print("\nLoading embedding model...")
-
-    model = SentenceTransformer(MODEL_NAME)
+        raise ValueError(
+            "No text could be extracted from the PDFs."
+        )
 
     texts = [doc["text"] for doc in documents]
 
-    print("Creating embeddings...")
+    print("\nCreating Gemini embeddings...")
 
-    embeddings = model.encode(
-        texts,
-        convert_to_numpy=True,
-        show_progress_bar=True
+    embeddings = create_embeddings(texts)
+
+    # Convert to numpy float32
+    import numpy as np
+
+    embeddings = np.array(
+        embeddings,
+        dtype="float32"
     )
 
-    # Convert to float32 for FAISS
-    embeddings = embeddings.astype("float32")
-
-    # Normalize embeddings so inner product behaves like cosine similarity
+    # Normalize for cosine similarity
     faiss.normalize_L2(embeddings)
 
     dimension = embeddings.shape[1]
+
+    print(f"Embedding dimension: {dimension}")
 
     index = faiss.IndexFlatIP(dimension)
 
     index.add(embeddings)
 
-    # Save index
-    RAG_DIR.mkdir(parents=True, exist_ok=True)
+    # Create RAG directory
+    RAG_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    faiss.write_index(index, str(INDEX_FILE))
+    # Save FAISS index
+    faiss.write_index(
+        index,
+        str(INDEX_FILE)
+    )
 
-    # Save metadata separately
-    with open(METADATA_FILE, "w", encoding="utf-8") as file:
-        json.dump(documents, file, ensure_ascii=False, indent=2)
+    # Save metadata
+    with open(
+        METADATA_FILE,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+        json.dump(
+            documents,
+            file,
+            ensure_ascii=False,
+            indent=2
+        )
 
     print("\n========== RAG INGESTION COMPLETE ==========")
     print(f"Documents: {len(pdf_files)}")
