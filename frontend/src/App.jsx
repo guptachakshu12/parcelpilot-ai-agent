@@ -65,7 +65,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "https://parcelpilot-ai-agent-0u4s.onrender.com/chat",
+       "http://127.0.0.1:8000/chat",
         {
           method: "POST",
           headers: {

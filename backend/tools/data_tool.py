@@ -176,10 +176,14 @@ def get_ticket_by_order_id(order_id: str):
     """
     Find ParcelPilot support tickets associated with an order ID.
 
-    Returns matching ticket details including ticket ID, status,
-    subject, description, channel, assignment, timestamps,
-    and historical resolution if available.
+    The supplied assessment dataset does not contain an order_id
+    column in the tickets table, so tickets cannot be directly
+    associated with an order.
     """
+
+    # ---------------------------------------------------------
+    # Validate ticket dataset
+    # ---------------------------------------------------------
 
     if TICKETS is None:
         return {
@@ -187,16 +191,48 @@ def get_ticket_by_order_id(order_id: str):
             "error": "Tickets data is unavailable."
         }
 
+    # ---------------------------------------------------------
+    # Check whether tickets contain an order_id column
+    # ---------------------------------------------------------
+
+    if "order_id" not in TICKETS.columns:
+
+        return {
+            "success": False,
+            "error": (
+                f"No support ticket could be directly associated "
+                f"with order {order_id}. "
+                f"The supplied ticket dataset does not contain "
+                f"an order_id field."
+            ),
+            "reason": "order_id_column_missing"
+        }
+
+    # ---------------------------------------------------------
+    # Find tickets linked to the order
+    # ---------------------------------------------------------
+
     result = TICKETS[
         TICKETS["order_id"].astype(str).str.upper()
         == order_id.upper()
     ]
 
+    # ---------------------------------------------------------
+    # No matching ticket
+    # ---------------------------------------------------------
+
     if result.empty:
+
         return {
             "success": False,
-            "error": f"No support ticket was found for order {order_id}."
+            "error": (
+                f"No support ticket was found for order {order_id}."
+            )
         }
+
+    # ---------------------------------------------------------
+    # Return matching tickets
+    # ---------------------------------------------------------
 
     return {
         "success": True,
