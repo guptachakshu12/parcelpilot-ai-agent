@@ -1,0 +1,18 @@
+[
+  {
+    "escalation_id": "ESC-001",
+    "ticket_id": "TKT-505",
+    "reason": "Possible production API key exposure",
+    "priority": "P1",
+    "status": "created",
+    "created_at": "2026-08-23T01:29:52.636222"
+  },
+  {
+    "escalation_id": "ESC-002",
+    "ticket_id": "TKT-505",
+    "reason": "Suspected production API key exposure in a public channel.",
+    "priority": "P1",
+    "status": "created",
+    "created_at": "2026-08-23T11:48:01.863147"
+  }
+]
